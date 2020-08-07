@@ -1,44 +1,100 @@
+// @ts-nocheck
 
 import {
+  attach,
   combine,
+  createEffect,
   createEvent,
   createStore,
+  Effect,
   Event,
   forward,
-  sample,
-  Store,
+  guard,
+
+
+  merge, sample,
+  Store
 } from "effector";
 
-interface FormPart<T> {
-  getInitial(): T;
-  validate(): Event<void>;
-}
+type CustomValidator<T> = (data: T) => boolean | Promise<boolean>;
 
-interface TypeDef {
-  getInitial(): any;
-}
-
-abstract class TypeDef {}
-interface Rule {
-  key: string;
-  payload: any;
+interface Rule<T = any> {
+  payload?: any;
   message?: string;
+  validator: (value: T, payload: any) => boolean | Promise<boolean>;
 }
 
-interface NumberTypeDef extends TypeDef {
-  required(): NumberTypeDef;
-  min(payload: number): NumberTypeDef;
-  max(payload: number): NumberTypeDef;
-  positive(): NumberTypeDef;
-  negative(): NumberTypeDef;
+interface TypeDef<T = any> {
+  protected getInitial(): any;
+  validation(validator: CustomValidator<T>, message?: string): TypeDef<T>;
+}
+
+interface NumberTypeDef extends TypeDef<number> {
+  required(message?: string): NumberTypeDef;
+  min(payload: number, message?: string): NumberTypeDef;
+  max(payload: number, message?: string): NumberTypeDef;
+  positive(message?: string): NumberTypeDef;
+  negative(message?: string): NumberTypeDef;
+  validation(
+    validator: CustomValidator<number>,
+    message?: string
+  ): NumberTypeDef;
 }
 
 interface StringTypeDef extends TypeDef {
-  required(): StringTypeDef;
-  pattern(pattern: RegExp | string): StringTypeDef;
+  required(message?: string): StringTypeDef;
+  pattern(pattern: RegExp | string, message?: string): StringTypeDef;
 
-  length(exact: number): StringTypeDef;
-  length(min: number, max: number): StringTypeDef;
+  length(exact: number, message?: string): StringTypeDef;
+  length(min: number, max: number, message?: string): StringTypeDef;
+  validation(
+    validator: CustomValidator<string>,
+    message?: string
+  ): StringTypeDef;
+}
+
+abstract class TypeDef<T = any> {
+  private initial: any;
+  private rules: Rule<T>[] = [];
+
+  protected setRule({ payload, message, validator }: Rule<T>) {
+    const newInstance = this.constructor(this.initial);
+
+    newInstance.rules = [...this.rules, { message, payload, validator }];
+    return newInstance;
+  }
+
+  required(message?: string) {
+    return this.setRule({
+      payload: null,
+      validator: Boolean,
+      message: message || "Required param",
+    });
+  }
+
+  getInitial() {
+    return this.initial;
+  }
+
+  protected async validate(value: any) {
+    for (const { payload, message, validator } of this.rules) {
+      const result = await validator(value, payload);
+      if (!result) {
+        return message || "Validation error";
+      }
+    }
+    return undefined;
+  }
+
+  validation<E extends (data: T) => boolean | Promise<boolean>>(
+    validator: E,
+    message?: string
+  ) {
+    return this.setRule({
+      validator,
+      message,
+    });
+  }
 }
 
 type NumberValidatorKey =
@@ -85,7 +141,11 @@ const stringValidators: {
 
 class NumberTypeDef extends TypeDef {
   private rules: Rule[] = [
-    { key: "type", payload: null, message: "Should be number" },
+    {
+      payload: null,
+      message: "must be number",
+      validator: numberValidators.type,
+    },
   ];
   private initial: number;
 
@@ -94,49 +154,34 @@ class NumberTypeDef extends TypeDef {
     this.initial = initial;
   }
 
-  private setRule(key: string, payload: any = true, message?: string) {
-    const newInstance = new NumberTypeDef(this.initial);
-    newInstance.rules = [...this.rules, { key, message, payload }];
-    return newInstance;
-  }
-
-  required(message?: string) {
-    return this.setRule("required", null, message);
-  }
-
   max(payload: number, message?: string) {
-    return this.setRule(
-      "max",
+    return this.setRule({
+      validator: numberValidators.max,
       payload,
-      message || `Value should be less then ${payload}`
-    );
+      message: message || `Value must be less then ${payload}`,
+    });
   }
 
   min(payload: number, message?: string) {
-    return this.setRule("min", payload, message);
+    return this.setRule({
+      validator: numberValidators.min,
+      payload,
+      message: message || `Value must be more then ${payload}`,
+    });
   }
 
   positive(message?: string) {
-    return this.setRule("positive", message);
+    return this.setRule({
+      validator: numberValidators.positive,
+      message: message || "Value must be positive",
+    });
   }
 
   negative(message?: string) {
-    return this.setRule("negative", message);
-  }
-
-  validate(value: number) {
-    for (const { key, payload, message } of this.rules) {
-      const validator = numberValidators[key as NumberValidatorKey];
-      const result = validator(value, payload);
-      if (!result) {
-        return message || "Validation error";
-      }
-    }
-    return undefined;
-  }
-
-  getInitial() {
-    return this.initial;
+    return this.setRule({
+      validator: numberValidators.positive,
+      message: message || "Value must be negative",
+    });
   }
 }
 
@@ -146,7 +191,7 @@ export const number = (initial?: number): NumberTypeDef => {
 
 class StringTypeDef extends TypeDef {
   private rules: Rule[] = [
-    { key: "type", payload: null, message: "Should be string" },
+    { validator: stringValidators.type, message: "Must be string" },
   ];
   private initial: string;
 
@@ -155,59 +200,49 @@ class StringTypeDef extends TypeDef {
     this.initial = initial;
   }
 
-  private setRule(key: string, payload: any = true, message?: string) {
-    const newInstance = new StringTypeDef(this.initial);
-    newInstance.rules = [...this.rules, { key, message, payload }];
-    return newInstance;
-  }
-
-  required() {
-    return this.setRule("required");
-  }
-
   pattern(pattern: RegExp | string, message?: string) {
     const patternParsed =
       typeof pattern === "string" ? new RegExp(pattern) : pattern;
-    return this.setRule("pattern", patternParsed, message);
-  }
-
-  validate(value: string) {
-    for (const { key, payload, message } of this.rules) {
-      const validator = stringValidators[key as StringValidatorKey];
-      const result = validator(value, payload);
-      if (!result) {
-        return message || "Validation error";
-      }
-    }
-    return undefined;
+    return this.setRule({
+      validator: stringValidators.pattern,
+      message,
+      payload: patternParsed,
+    });
   }
 
   endsWidth(payload: string, message?: string) {
-    return this.setRule("endsWith", payload, message);
+    return this.setRule({
+      message,
+      payload,
+      validator: stringValidators.endsWith,
+    });
   }
 
   startsWith(payload: string, message?: string) {
-    return this.setRule("startsWith", payload, message);
+    return this.setRule({
+      message,
+      payload,
+      validator: stringValidators.startsWith,
+    });
   }
 
   length(min: number, message?: string): StringTypeDef;
   length(min: number, max?: number, message?: string): StringTypeDef;
   length(min: number, max?: number | string, message?: string) {
     const isRange = typeof max === "number";
-    return this.setRule(
-      "length",
-      isRange ? { min, max } : min,
-      isRange ? message : (max as string)
-    );
+    return this.setRule({
+      validator: stringValidators.length,
+      message: isRange ? message : (max as string),
+      payload: isRange ? { min, max } : min,
+    });
   }
 
-  //   enum(...options: string[]): StringTypeDef; // consider message argument position, on hold
   enum(options: string[], message?: string) {
-    return this.setRule("enum", options, message);
-  }
-
-  getInitial() {
-    return this.initial;
+    return this.setRule({
+      validator: stringValidators.enum,
+      message,
+      payload: options,
+    });
   }
 }
 
@@ -220,10 +255,6 @@ type UnionToIntersection<U> = (
 ) extends (a: infer I) => 0
   ? I
   : never;
-
-type Callable<K extends keyof T, T> = Event<{ key: K; payload: T[K] }>;
-
-type Fn<T extends string | number | symbol, V> = Callable<T, { [K in T]: V }>;
 
 type UnionOfFn<T> = {
   [K in keyof T]: Event<{ key: K; payload: T[K] }>;
@@ -239,8 +270,6 @@ type KeysNotMatching<T, V> = {
 
 type PrimitiveOnly<T> = { [key in KeysNotMatching<T, Form<any>>]: T[key] };
 
-type E = PrimitiveOnly<{ foo: StringTypeDef; bar: Form<any> }>;
-
 interface Form<T> {
   onChange(cb: (data: Values<T>) => void): void;
   onSubmit(cb: (data: Values<T>) => void): void;
@@ -252,6 +281,8 @@ interface Form<T> {
   values: Store<Values<T>>;
   errors: Store<Errors<T>>;
   error: Event<Errors<T>>;
+  submitted: Event<Values<T>>;
+  validateField: Effect<keyof T, void, Error>;
 }
 
 type Values<T> = T extends Schema<infer U>
@@ -277,7 +308,6 @@ type Value<T> = T extends NumberTypeDef
   : T extends StringTypeDef
   ? string
   : never;
-// type Value<T> = T
 
 export const createForm = <T>(schema: Schema<T>): Form<T> => {
   const parsedSchema = { ...schema };
@@ -291,9 +321,13 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
   const $ownErrors = createStore({});
   const $nestedErrors = createStore({});
 
-  const $errors = createStore({})
-    .on($ownErrors, (state, own) => ({ ...state, ...own }))
-    .on($nestedErrors, (state, nested) => ({ ...state, ...nested }));
+  const errorOccured = sample(merge([$ownErrors, $nestedErrors]));
+  
+  const $errors = createStore({}).on(errorOccured, (state, errs) =>
+    isEmptyObject(errs) ? state : { ...state, ...errs }
+  );
+  // .on($nestedErrors, (state, nested) => ({ ...state, ...nested }));
+
   const errorsSampled = sample($errors);
 
   const fill = createEvent<T>();
@@ -311,12 +345,12 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
       nestedState[key] = payload.getInitial();
       continue;
     }
-	 
-	 // @ts-ignore
+
+    // @ts-ignore
     parsedSchema[key] = createForm(payload);
-	 nestedKeys.push(key);
-	 
-	 // @ts-ignore
+    nestedKeys.push(key);
+
+    // @ts-ignore
     nestedState[key] = parsedSchema[key].getInitial();
   }
 
@@ -338,8 +372,7 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
       [key]: errors,
     }));
 
-	 
-	 // @ts-ignore
+    // @ts-ignore
     forward({ from: fill, to: nestedForm.fill.prepend((data) => data[key]) });
   });
 
@@ -348,6 +381,7 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
     ...nested,
     ...own,
   }));
+
   $ownState
     .on(set, (state, { key, payload }) => ({
       ...state,
@@ -355,102 +389,127 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
     }))
     .on(fill, (state, data) => {
       for (const key of ownKeys) {
-			
-			// @ts-ignore
+        // @ts-ignore
         state[key] = data[key];
       }
       return { ...state };
     });
 
   const validate = createEvent();
+  const validateField = attach({
+    source: $ownState,
+    mapParams: (key: keyof T, state) => ({ key, value: state[key] }),
+    effect: createEffect({
+      handler: ({ key, value }: any) => {
+        return parsedSchema[key].validate(value);
+      },
+    }),
+  });
+
+  const err = guard(validateField.done, {
+    filter: ({ params }) => ownKeys.includes(params as string),
+  });
+
+  $ownErrors.on(err, (errs, { params, result }) => ({
+    ...errs,
+    [params]: result,
+  }));
+
+  const validateOwn = attach({
+    source: $ownState,
+    mapParams: (_: void, state) => state,
+    effect: createEffect({
+      async handler(state) {
+        const promises = [];
+        for (const key of ownKeys) {
+          promises.push(
+            parsedSchema[key].validate(state[key]).catch((e) => e.message)
+          );
+        }
+        const results = await Promise.all(promises);
+        return ownKeys.reduce((carry, key, i) => {
+          const result = results[i];
+          if (!result) {
+            return carry;
+          }
+
+          if (typeof result === "object") {
+            if (Object.keys(result).length) {
+              carry[key] = result;
+            }
+
+            return carry;
+          }
+          carry[key] = result;
+          return carry;
+        }, {});
+      },
+    }),
+  });
+
   forward({
-	 from: validate,
-	 
-	 // @ts-ignore
-    to: nestedKeys.map((key) => parsedSchema[key as keyof T].validate),
+    from: validate,
+
+    // @ts-ignore
+    to: [
+      nestedKeys.map((key) => parsedSchema[key as keyof T].validate),
+      validateOwn,
+    ],
   });
 
-  const error = sample($values, validate, (values) => {
-    const result = {};
+  $ownErrors.on(validateOwn.doneData, (state, errs) => ({
+    ...state,
+    ...errs,
+  }));
+  const submit = createEvent();
+  const submitted = sample($values, submit);
 
-    ownKeys.forEach((key) => {
-		const typeDef = schema[key as keyof T];
-		
-		// @ts-ignore
-      const validationResult = typeDef.validate(values[key]);
-      if (validationResult) {
-			
-			// @ts-ignore
-        result[key as keyof T] = validationResult;
-      }
-    });
-
-    return result;
-  });
-
-  $ownErrors.on(error, (state, errs) => ({ ...state, ...errs }));
-
+  const isValid = $errors.map(checkIsValid)
   return {
     onChange: () => void 0,
-	 onSubmit: () => void 0,
-	 
-	 // @ts-ignore
-	 error,
-	 
-	 // @ts-ignore
+    onSubmit: () => void 0,
+    submitted,
+    submit,
+    error: sample(
+      $errors.updates.filter({
+        fn: (t) => !!(typeof T === "object" ? Object.keys(t).length : t),
+      })
+    ),
     set,
     validate,
     getInitial: () => $values.defaultState,
-	 // @ts-ignore
     fill,
-	 // @ts-ignore
     values: $values,
-	 // @ts-ignore
     errors: sample(errorsSampled),
-    //@ts-ignore
+    isValid,
     __kind: "form",
-	};
+    validateField,
+  };
 };
 
 /*
 TODO:
 - async validation
 - array of items
-- object typedef (?)
+- object typedef (?) - provided with inline form
 */
 
 const isForm = (entity: any): entity is Form<any> => {
-	//@ts-ignore
-	return entity.__kind === "form";
+  //@ts-ignore
+  return entity.__kind === "form";
 };
 
-const contacts = createForm({
-	city: string(),
-	street: string(),
-});
+const isEmptyObject = <T>(obj: T) => {
+  return Object.keys(obj).length === 0;
+};
 
-// const form = createForm({
-// 	foo: {
-// 		bar: {
-// 			baz: number().required(),
-// 		},
-// 	},
-// 	name: string(),
-// 	contacts,
-// });
+function checkIsValid(obj){
+  if(typeof obj === "object"){
+    if(isEmptyObject(obj)){
+      return true;
+    }
 
-// // form.values.watch(console.log);
-
-// // form.fill({
-// // 	contacts: { city: "foo", street: "bar" },
-// // 	foo: {
-// // 		bar: {
-// // 			baz: 123,
-// // 		},
-// // 	},
-// // 	name: "asd",
-// // });
-
-// if (window) {
-	//   Object.assign(window, { createForm, string, number, form });
-// }
+    return Object.values(obj).every(checkIsValid);
+  }
+  return false;
+}
