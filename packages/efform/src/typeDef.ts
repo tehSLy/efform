@@ -1,35 +1,23 @@
 // @ts-nocheck
 
-import {
-  attach,
-  combine,
-  createEffect,
-  createEvent,
-  createStore,
-  Effect,
-  Event,
-  forward,
-  guard,
+import { Effect, Event, Store } from "effector";
 
+export type CustomValidator<T> = (data: T) => boolean | Promise<boolean>;
 
-  merge, sample,
-  Store
-} from "effector";
-
-type CustomValidator<T> = (data: T) => boolean | Promise<boolean>;
-
-interface Rule<T = any> {
+export interface Rule<T = any> {
   payload?: any;
   message?: string;
   validator: (value: T, payload: any) => boolean | Promise<boolean>;
+  async: boolean;
+  key?: string;
 }
 
-interface TypeDef<T = any> {
+export interface TypeDef<T = any> {
   protected getInitial(): any;
   validation(validator: CustomValidator<T>, message?: string): TypeDef<T>;
 }
 
-interface NumberTypeDef extends TypeDef<number> {
+export interface NumberTypeDef extends TypeDef<number> {
   required(message?: string): NumberTypeDef;
   min(payload: number, message?: string): NumberTypeDef;
   max(payload: number, message?: string): NumberTypeDef;
@@ -41,7 +29,7 @@ interface NumberTypeDef extends TypeDef<number> {
   ): NumberTypeDef;
 }
 
-interface StringTypeDef extends TypeDef {
+export interface StringTypeDef extends TypeDef<string> {
   required(message?: string): StringTypeDef;
   pattern(pattern: RegExp | string, message?: string): StringTypeDef;
 
@@ -53,15 +41,21 @@ interface StringTypeDef extends TypeDef {
   ): StringTypeDef;
 }
 
-abstract class TypeDef<T = any> {
+export interface BooleanTypeDef extends TypeDef<boolean> {}
+
+export interface ArrayTypeDef<T> extends TypeDef<T[]> {}
+
+export abstract class TypeDef<T = any> {
   private initial: any;
+
   private rules: Rule<T>[] = [];
+  private asyncRules: Rule<T> = [];
 
-  protected setRule({ payload, message, validator }: Rule<T>) {
+  protected setRule({ payload, message, validator, async }: Rule<T>) {
     const newInstance = this.constructor(this.initial);
-
-    newInstance.rules = [...this.rules, { message, payload, validator }];
-    return newInstance;
+    const key = async ? "asyncRules" : "rules";
+    newInstance[key] = [...this[key], { message, payload, validator }];
+    return newInstance as this;
   }
 
   required(message?: string) {
@@ -76,9 +70,19 @@ abstract class TypeDef<T = any> {
     return this.initial;
   }
 
-  protected async validate(value: any) {
-    for (const { payload, message, validator } of this.rules) {
+  protected async validateAsync(value: any) {
+    for (const { payload, message, validator } of this.asyncRules) {
       const result = await validator(value, payload);
+      if (!result) {
+        return message || "Validation error";
+      }
+    }
+    return undefined;
+  }
+
+  protected validate(value: any) {
+    for (const { payload, message, validator } of this.rules) {
+      const result = validator(value, payload);
       if (!result) {
         return message || "Validation error";
       }
@@ -93,18 +97,23 @@ abstract class TypeDef<T = any> {
     return this.setRule({
       validator,
       message,
+      async: true,
     });
+  }
+
+  public static resolveInitial<T>(typeDef: TypeDef<T>) {
+    return typeDef.getInitial() as T;
   }
 }
 
-type NumberValidatorKey =
+export type NumberValidatorKey =
   | "required"
   | "min"
   | "max"
   | "negative"
   | "positive"
   | "type";
-type StringValidatorKey =
+export type StringValidatorKey =
   | "required"
   | "pattern"
   | "length"
@@ -113,7 +122,7 @@ type StringValidatorKey =
   | "endsWith"
   | "type";
 
-const numberValidators: {
+export const numberValidators: {
   [key in NumberValidatorKey]: (v: number, payload: any) => boolean;
 } = {
   required: (v) => !!v,
@@ -124,7 +133,7 @@ const numberValidators: {
   type: (v) => typeof v === "number",
 };
 
-const stringValidators: {
+export const stringValidators: {
   [key in StringValidatorKey]: (v: string, payload: any) => boolean;
 } = {
   length: (v, payload) =>
@@ -139,7 +148,7 @@ const stringValidators: {
   type: (v) => typeof v === "string",
 };
 
-class NumberTypeDef extends TypeDef {
+export class NumberTypeDef extends TypeDef<number> {
   private rules: Rule[] = [
     {
       payload: null,
@@ -189,7 +198,7 @@ export const number = (initial?: number): NumberTypeDef => {
   return new NumberTypeDef(initial);
 };
 
-class StringTypeDef extends TypeDef {
+export class StringTypeDef extends TypeDef {
   private rules: Rule[] = [
     { validator: stringValidators.type, message: "Must be string" },
   ];
@@ -246,8 +255,20 @@ class StringTypeDef extends TypeDef {
   }
 }
 
+export class ArrayTypeDef<T> extends TypeDef<T[]> {}
+
+export class BooleanTypeDef extends TypeDef {}
+
 export const string = (initial?: string): StringTypeDef => {
   return new StringTypeDef(initial);
+};
+
+export const boolean = () => {
+  return new BooleanTypeDef();
+};
+
+export const array = <T>(schema: T, initial?: ValuesT[]) => {
+  return new ArrayTypeDef<T>();
 };
 
 type UnionToIntersection<U> = (
@@ -262,30 +283,49 @@ type UnionOfFn<T> = {
 
 type IntersectionOfFn<T> = UnionToIntersection<UnionOfFn<T>>;
 
-type Schema<T> = { [key in keyof T]: T[key] };
+export type Schema<T> = { [key in keyof T]: T[key] };
 
 type KeysNotMatching<T, V> = {
   [K in keyof T]-?: T[K] extends V ? never : K;
 }[keyof T];
 
-type PrimitiveOnly<T> = { [key in KeysNotMatching<T, Form<any>>]: T[key] };
+export type PrimitiveOnly<T> = {
+  [key in KeysNotMatching<T, Form<any>>]: T[key];
+};
 
-interface Form<T> {
+export interface Form<T> {
   onChange(cb: (data: Values<T>) => void): void;
   onSubmit(cb: (data: Values<T>) => void): void;
+
   changed: Event<Values<T>>;
-  set: IntersectionOfFn<Values<PrimitiveOnly<T>>>;
+  submitted: Event<Values<T>>;
+
+  //merge
+  // set: IntersectionOfFn<Values<PrimitiveOnly<Values<T>>>>; // this option is not working correctly
+  set: IntersectionOfFn<Values<T>>;
   fill: Event<Values<T>>;
   validate: Event<void>;
+
   getInitial(): Values<T>;
   values: Store<Values<T>>;
   errors: Store<Errors<T>>;
   error: Event<Errors<T>>;
-  submitted: Event<Values<T>>;
   validateField: Effect<keyof T, void, Error>;
 }
 
-type Values<T> = T extends Schema<infer U>
+export interface FormMeta<T> {
+  getOwnKeys(): string[];
+  getMeta(): T;
+  
+}
+
+export type ValuesGeneric<T> = T extends Values<infer G>
+  ? Values<G>
+  : T extends Value<infer U>
+  ? Value<U>
+  : never;
+
+export type Values<T> = T extends Schema<infer U>
   ? {
       [key in keyof U]: U[key] extends Form<infer G>
         ? Values<Schema<G>>
@@ -295,221 +335,31 @@ type Values<T> = T extends Schema<infer U>
     }
   : never;
 
-type Errors<T> = T extends Schema<infer U>
+export type Errors<T> = T extends Schema<infer U>
   ? {
-      [key in keyof U]: U[key] extends Schema<infer G>
+      [key in keyof U]: U[key] extends Form<infer G>
+        ? Errors<G>
+        : U[key] extends Schema<infer G>
         ? Values<Schema<G>>
         : string | undefined;
     }
   : never;
 
-type Value<T> = T extends NumberTypeDef
+export type Value<T> = T extends NumberTypeDef
   ? number
+  : T extends ArrayTypeDef<infer U>
+  ? Value<U>[]
   : T extends StringTypeDef
   ? string
+  : T extends BooleanTypeDef
+  ? boolean
   : never;
-
-export const createForm = <T>(schema: Schema<T>): Form<T> => {
-  const parsedSchema = { ...schema };
-
-  const ownKeys: string[] = [];
-  const nestedKeys: string[] = [];
-
-  const ownState = {} as any;
-  const nestedState = {} as any;
-
-  const $ownErrors = createStore({});
-  const $nestedErrors = createStore({});
-
-  const errorOccured = sample(merge([$ownErrors, $nestedErrors]));
-  
-  const $errors = createStore({}).on(errorOccured, (state, errs) =>
-    isEmptyObject(errs) ? state : { ...state, ...errs }
-  );
-  // .on($nestedErrors, (state, nested) => ({ ...state, ...nested }));
-
-  const errorsSampled = sample($errors);
-
-  const fill = createEvent<T>();
-
-  // resolve initial state, parse form keys to determine parents
-  for (const key in parsedSchema) {
-    const payload = parsedSchema[key];
-    if (payload instanceof TypeDef) {
-      ownKeys.push(key);
-      ownState[key] = payload.getInitial();
-      continue;
-    }
-    if (isForm(payload)) {
-      nestedKeys.push(key);
-      nestedState[key] = payload.getInitial();
-      continue;
-    }
-
-    // @ts-ignore
-    parsedSchema[key] = createForm(payload);
-    nestedKeys.push(key);
-
-    // @ts-ignore
-    nestedState[key] = parsedSchema[key].getInitial();
-  }
-
-  const $ownState = createStore(ownState);
-  const $nestedState = createStore(nestedState);
-
-  nestedKeys.forEach((key) => {
-    const nestedForm = (parsedSchema[key as keyof T] as any) as Form<
-      T[keyof T]
-    >;
-
-    $nestedState.on(nestedForm.values, (state, nested) => ({
-      ...state,
-      [key]: nested,
-    }));
-
-    $nestedErrors.on(nestedForm.error, (state, errors) => ({
-      ...state,
-      [key]: errors,
-    }));
-
-    // @ts-ignore
-    forward({ from: fill, to: nestedForm.fill.prepend((data) => data[key]) });
-  });
-
-  const set = createEvent<{ key: keyof Values<T>; payload: any }>();
-  const $values = combine($ownState, $nestedState, (own, nested) => ({
-    ...nested,
-    ...own,
-  }));
-
-  $ownState
-    .on(set, (state, { key, payload }) => ({
-      ...state,
-      [key]: payload,
-    }))
-    .on(fill, (state, data) => {
-      for (const key of ownKeys) {
-        // @ts-ignore
-        state[key] = data[key];
-      }
-      return { ...state };
-    });
-
-  const validate = createEvent();
-  const validateField = attach({
-    source: $ownState,
-    mapParams: (key: keyof T, state) => ({ key, value: state[key] }),
-    effect: createEffect({
-      handler: ({ key, value }: any) => {
-        return parsedSchema[key].validate(value);
-      },
-    }),
-  });
-
-  const err = guard(validateField.done, {
-    filter: ({ params }) => ownKeys.includes(params as string),
-  });
-
-  $ownErrors.on(err, (errs, { params, result }) => ({
-    ...errs,
-    [params]: result,
-  }));
-
-  const validateOwn = attach({
-    source: $ownState,
-    mapParams: (_: void, state) => state,
-    effect: createEffect({
-      async handler(state) {
-        const promises = [];
-        for (const key of ownKeys) {
-          promises.push(
-            parsedSchema[key].validate(state[key]).catch((e) => e.message)
-          );
-        }
-        const results = await Promise.all(promises);
-        return ownKeys.reduce((carry, key, i) => {
-          const result = results[i];
-          if (!result) {
-            return carry;
-          }
-
-          if (typeof result === "object") {
-            if (Object.keys(result).length) {
-              carry[key] = result;
-            }
-
-            return carry;
-          }
-          carry[key] = result;
-          return carry;
-        }, {});
-      },
-    }),
-  });
-
-  forward({
-    from: validate,
-
-    // @ts-ignore
-    to: [
-      nestedKeys.map((key) => parsedSchema[key as keyof T].validate),
-      validateOwn,
-    ],
-  });
-
-  $ownErrors.on(validateOwn.doneData, (state, errs) => ({
-    ...state,
-    ...errs,
-  }));
-  const submit = createEvent();
-  const submitted = sample($values, submit);
-
-  const isValid = $errors.map(checkIsValid)
-  return {
-    onChange: () => void 0,
-    onSubmit: () => void 0,
-    submitted,
-    submit,
-    error: sample(
-      $errors.updates.filter({
-        fn: (t) => !!(typeof T === "object" ? Object.keys(t).length : t),
-      })
-    ),
-    set,
-    validate,
-    getInitial: () => $values.defaultState,
-    fill,
-    values: $values,
-    errors: sample(errorsSampled),
-    isValid,
-    __kind: "form",
-    validateField,
-  };
-};
 
 /*
 TODO:
 - async validation
 - array of items
 - object typedef (?) - provided with inline form
+- set multiple fields at once
+- consider, reversing meta types and value types on form creation, may be difficult for complicated and multilevel fields
 */
-
-const isForm = (entity: any): entity is Form<any> => {
-  //@ts-ignore
-  return entity.__kind === "form";
-};
-
-const isEmptyObject = <T>(obj: T) => {
-  return Object.keys(obj).length === 0;
-};
-
-function checkIsValid(obj){
-  if(typeof obj === "object"){
-    if(isEmptyObject(obj)){
-      return true;
-    }
-
-    return Object.values(obj).every(checkIsValid);
-  }
-  return false;
-}

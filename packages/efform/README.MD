@@ -20,4 +20,6 @@ const form = createForm({
 forward({from: form.submitted, to: fxSendForm})
 form.submit()
 // => {name: "", age: 18, email: ""}
+
+const Field = createField(form, ({value, onChange}) => <input  />)
 ```

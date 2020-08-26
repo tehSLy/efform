@@ -1,5 +1,6 @@
 // const {createForm, number, string} = require('./typeDef')
-import { createForm, number, string } from "./typeDef";
+import { createForm } from "../src/createForm";
+import { number, string } from "../src/typeDef";
 
 describe("General test", () => {
   it("resolves default values correctly", () => {
@@ -75,12 +76,27 @@ describe("General test", () => {
     });
 
     await form.validateField("name");
-	 expect(form.errors.getState().name).toBe(message);
-	 
-	 form.set({key: "name", payload: correct});
-	 
-	 await form.validateField("name");
-	 expect(form.errors.getState().name).toBeFalsy();
+    expect(form.errors.getState().name).toBe(message);
+
+    form.set({ key: "name", payload: correct });
+
+    await form.validateField("name");
+    expect(form.errors.getState().name).toBeFalsy();
+  });
+
+  it("batches sync validation results", async () => {
+    const form = createForm({
+      // branch #1
+      foo: {
+        foo1: string().required(),
+        foo2: number().required(),
+      },
+      //branch #2
+      bar: {
+        bar1: number().validation(() => delay(500, true)),
+        bar2: string().validation(() => delay(1000, false)),
+      },
+    });
   });
 });
 
