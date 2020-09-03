@@ -7,14 +7,14 @@ import {
   forward,
   guard,
   merge,
-  sample,
+  sample
 } from "effector";
 import { is } from "./is";
-import { Form, FormMeta, Schema, TypeDef, Values } from "./typeDef";
+import { Form, FormMeta, FormValues, Schema, TypeDef, Values } from "./typeDef";
 
 const empty = {};
 
-export const createForm = <T>(schema: Schema<T>): Form<T> => {
+export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
   const parsedSchema = { ...schema } as Schema<T>;
 
   const ownKeys: string[] = [];
@@ -23,20 +23,14 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
   const ownState = {} as any;
   const nestedState = {} as any;
 
-  const $ownErrors = createStore({});
-  const $nestedErrors = createStore({});
+  const ownErrorsState = {} as any;
+  const nestedErrorsState = {} as any;
 
-  const errorOccured = sample<Object>(
-    //@ts-ignore
-    merge([$ownErrors.updates, $nestedErrors.updates])
-  );
+  const ownTouched = {} as any;
+  const nestedTouched = {} as any;
 
-  const $errors = createStore({}).on(errorOccured, (state, errs) =>
-    isEmptyObject(errs) ? state : { ...state, ...errs }
-  );
-  // .on($nestedErrors, (state, nested) => ({ ...state, ...nested }));
-
-  const errorsSampled = sample($errors);
+  const ownDirty = {} as any;
+  const nestedDirty = {} as any;
 
   const fill = createEvent<T>();
 
@@ -46,24 +40,43 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
     if (payload instanceof TypeDef) {
       ownKeys.push(key);
       ownState[key] = TypeDef.resolveInitial(payload);
+
+      ownErrorsState[key] = undefined;
       continue;
     }
     if (is.form(payload)) {
       nestedKeys.push(key);
       nestedState[key] = payload.getInitial();
+
+      nestedErrorsState[key] = payload.errors.defaultState;
       continue;
     }
 
+    const inlineForm = createForm(payload);
     // @ts-ignore
-    parsedSchema[key] = createForm(payload);
+    parsedSchema[key] = inlineForm;
     nestedKeys.push(key);
 
-    // @ts-ignore
-    nestedState[key] = parsedSchema[key].getInitial();
+
+    nestedState[key] = inlineForm.getInitial();
+    nestedErrorsState[key] = inlineForm.errors.defaultState
   }
 
   const $ownState = createStore(ownState);
   const $nestedState = createStore(nestedState);
+
+  const $ownErrors = createStore(ownErrorsState);
+  const $nestedErrors = createStore(nestedErrorsState);
+
+  const $ownTouched = createStore(ownTouched);
+  const $nestedTouched = createStore(nestedTouched);
+
+  const $ownDirty = createStore(ownDirty);
+  const $nestedDirty = createStore(nestedDirty);
+
+  const $errors = combine($ownErrors, $nestedErrors, (own, nested) => ({...own, ...nested}))
+
+  const errorsSampled = sample($errors);
 
   nestedKeys.forEach((key) => {
     const nestedForm = (parsedSchema[key as keyof T] as any) as Form<
@@ -126,7 +139,6 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
 
   const validateOwnSync = sample($ownState, validate, (state) => {
     const errs = [];
-    console.log({ ownState });
     for (const key of ownKeys) {
       const validator = parsedSchema[key as keyof Schema<T>];
       //@ts-ignore
@@ -229,11 +241,15 @@ export const createForm = <T>(schema: Schema<T>): Form<T> => {
     errors: sample(errorsSampled),
     isValid,
     __kind: "form",
+    //@ts-ignore
     validateField,
+    touched: null,
+    dirty: null,
+    merge: null,
     ...meta
   };
 };
-console.log("v", "1.11");
+console.log("v", "1.12");
 /* 
  - guard isValid & submit
 */
