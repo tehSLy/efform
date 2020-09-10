@@ -1,8 +1,7 @@
 {
   "name": "efform",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "",
-  "main": "index.html",
   "scripts": {
     "test": "jest",
     "start": "parcel index.html",
@@ -25,5 +24,6 @@
     "ts-jest": "^26.1.3",
     "tslib": "^2.0.1",
     "typescript": "^3.9.7"
-  }
+  },
+  "main": "./dist/index.js"
 }

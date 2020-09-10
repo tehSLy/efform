@@ -9,5 +9,5 @@ export const is = {
     payload instanceof ArrayTypeDef,
   form: <T = unknown>(payload: unknown): payload is Form<T> =>
     //@ts-ignore
-    payload.__kind === "form",
+    typeof payload.getMeta === "function" && payload.getMeta().kind === "form",
 };

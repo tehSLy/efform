@@ -6,13 +6,12 @@ import {
   createStore,
   forward,
   guard,
-  merge,
-  sample
+  sample,
 } from "effector";
+import { createFields } from "./createSetters";
 import { is } from "./is";
 import { Form, FormMeta, FormValues, Schema, TypeDef, Values } from "./typeDef";
 
-const empty = {};
 
 export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
   const parsedSchema = { ...schema } as Schema<T>;
@@ -26,13 +25,10 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
   const ownErrorsState = {} as any;
   const nestedErrorsState = {} as any;
 
-  const ownTouched = {} as any;
-  const nestedTouched = {} as any;
-
-  const ownDirty = {} as any;
-  const nestedDirty = {} as any;
-
   const fill = createEvent<T>();
+  const setErrors = createEvent<any>();
+
+  const reset = createEvent();
 
   // resolve initial state, parse form keys to determine parents
   for (const key in parsedSchema) {
@@ -46,7 +42,7 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
     }
     if (is.form(payload)) {
       nestedKeys.push(key);
-      nestedState[key] = payload.getInitial();
+      nestedState[key] = payload.values.defaultState;
 
       nestedErrorsState[key] = payload.errors.defaultState;
       continue;
@@ -57,9 +53,8 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
     parsedSchema[key] = inlineForm;
     nestedKeys.push(key);
 
-
-    nestedState[key] = inlineForm.getInitial();
-    nestedErrorsState[key] = inlineForm.errors.defaultState
+    nestedState[key] = inlineForm.values.defaultState;
+    nestedErrorsState[key] = inlineForm.errors.defaultState;
   }
 
   const $ownState = createStore(ownState);
@@ -68,14 +63,12 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
   const $ownErrors = createStore(ownErrorsState);
   const $nestedErrors = createStore(nestedErrorsState);
 
-  const $ownTouched = createStore(ownTouched);
-  const $nestedTouched = createStore(nestedTouched);
+  const $errors = combine($ownErrors, $nestedErrors, (own, nested) => ({
+    ...own,
+    ...nested,
+  }));
 
-  const $ownDirty = createStore(ownDirty);
-  const $nestedDirty = createStore(nestedDirty);
-
-  const $errors = combine($ownErrors, $nestedErrors, (own, nested) => ({...own, ...nested}))
-
+  // const errorsSampled = sample($errors);
   const errorsSampled = sample($errors);
 
   nestedKeys.forEach((key) => {
@@ -88,13 +81,24 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
       [key]: nested,
     }));
 
-    $nestedErrors.on(nestedForm.error, (state, errors) => ({
+    $nestedErrors.on(nestedForm.errors, (state, errors) => ({
       ...state,
       [key]: errors,
     }));
 
     // @ts-ignore
-    forward({ from: fill, to: nestedForm.fill.prepend((data) => data[key]) });
+    guard(
+      fill.map((data) => data[key]),
+      {
+        filter: Boolean,
+        target: nestedForm.fill,
+      }
+    );
+
+    forward({
+      from: setErrors,
+      to: nestedForm.setErrors.prepend((data) => data[key]),
+    });
   });
 
   const set = createEvent<{ key: keyof Values<T>; payload: any }>();
@@ -109,14 +113,17 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
       [key]: payload,
     }))
     .on(fill, (state, data) => {
+      const res = {...state};
       for (const key of ownKeys) {
-        // @ts-ignore
-        state[key] = data[key];
+        if (key in data) {
+          // @ts-ignore
+          res[key] = data[key];
+        }
       }
-      return { ...state };
-    });
+      return res;
+    })
+    .reset(reset);
 
-  const validate = createEvent();
   const validateField = attach({
     source: $ownState,
     mapParams: (key: keyof T, state) => ({ key, value: state[key] }),
@@ -132,122 +139,111 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
     filter: ({ params }) => ownKeys.includes(params as string),
   });
 
-  $ownErrors.on(err, (errs, { params, result }) => ({
-    ...errs,
-    [params]: result,
-  }));
-
-  const validateOwnSync = sample($ownState, validate, (state) => {
-    const errs = [];
-    for (const key of ownKeys) {
-      const validator = parsedSchema[key as keyof Schema<T>];
-      //@ts-ignore
-      const result = validator.validate(state[key]);
-      if (result) {
-        errs.push([key, result]);
-      }
-    }
-
-    return errs.length ? Object.fromEntries(errs) : null;
-  });
-
-  const validateOwn = attach({
-    source: $ownState,
-    mapParams: (_: void, state) => state,
-    effect: createEffect({
-      async handler(state: any) {
-        const promises = [];
-        for (const key of ownKeys) {
-          promises.push(
-            //@ts-ignore
-            parsedSchema[key as keyof Schema<T>]
-              //@ts-ignore
-              .validateAsync(state[key])
-              //@ts-ignore
-              .catch((e) => e.message)
-          );
+  $ownErrors
+    .on(err, (errs, { params, result }) => ({
+      ...errs,
+      [params]: result,
+    }))
+    .on(setErrors, (state, errs) => {
+      let changed = false;
+      for (const key of ownKeys) {
+        if (state[key] !== errs[key]) {
+          changed = true;
         }
-        const results = await Promise.all(promises);
-        const result = ownKeys.reduce((carry, key, i) => {
-          const result = results[i];
-          if (!result) {
-            return carry;
-          }
+      }
 
-          if (typeof result === "object") {
-            if (Object.keys(result).length) {
-              carry[key] = result;
-            }
+      return changed ? { ...state, ...errs } : state;
+    })
+    .reset(reset);
 
-            return carry;
+  const validateInternal = attach({
+    source: $values,
+    effect: createEffect({
+      handler: async (state: any) => {
+        const ownResult = {};
+        const nestedResult = {};
+
+        const ownPromises = {};
+        const nestedPromises = {};
+
+        for (const key of ownKeys) {
+          const field = parsedSchema[key];
+
+          ownResult[key] = field.validate(state[key]); // either string or undefined
+
+          if (!ownResult[key]) {
+            ownPromises[key] = field
+              .validateAsync(state[key])
+              .then((v) => (ownResult[key] = v));
           }
-          carry[key] = result;
-          return carry;
-        }, {} as Record<string, any>);
-        return Object.keys(result).length ? result : null;
+        }
+
+        for (const key of nestedKeys) {
+          const formPart = parsedSchema[key] as Form<any>;
+          nestedPromises[key] = formPart
+            .getMeta()
+            .validateInternal()
+            .then((v) => (nestedResult[key] = v));
+        }
+
+        await Promise.all([
+          ...Object.values(ownPromises),
+          ...Object.values(nestedPromises),
+        ]);
+
+        return { ...ownResult, ...nestedResult };
       },
     }),
+    mapParams: (_: void, state) => state,
   });
 
-  forward({
-    from: validate,
-    to: [
-      ...nestedKeys.map(
-        (key) => (parsedSchema[key as keyof T] as any).validate
-      ),
-      validateOwn,
-      validateOwnSync,
-    ],
+  const validate = createEffect({
+    async handler() {
+      // this need in purpose of determining root of validation tree session
+      return validateInternal();
+    },
   });
-  $ownErrors.on([validateOwn.doneData, validateOwnSync], (state, errs) =>
-    errs
-      ? {
-          ...state,
-          ...errs,
-        }
-      : $ownErrors.defaultState
-  );
-  const submit = createEvent();
-  const submitted = sample($values, submit);
+
+  forward({ from: validate.doneData, to: setErrors });
 
   const isValid = $errors.map(checkIsValid);
+  const submit = createEvent();
+  const submitted = guard(sample($values, submit), {
+    filter: isValid,
+  });
 
   const meta: FormMeta<T> = {
     getMeta: () => schema,
+    //@ts-ignore
     getOwnKeys: () => ownKeys,
+    //@ts-ignore
+    getNestedKeys: () => nestedKeys,
+    //@ts-ignore
+    getParsedSchema: () => parsedSchema,
+    //@ts-ignore
+    validateInternal,
+    kind: "form",
   };
 
-  return {
-    onChange: () => void 0,
-    onSubmit: () => void 0,
+  const form = ({
     submitted,
     submit,
-    //@ts-ignore
-    error: sample(
-      //@ts-ignore
-      $errors.updates.filter({
-        //@ts-ignore
-        fn: (t) => !!(typeof T === "object" ? Object.keys(t).length : t),
-      })
-    ),
-    //@ts-ignore
     set,
-    validate,
-    getInitial: () => $values.defaultState,
-    //@ts-ignore
+    validate: validate,
     fill,
     values: $values,
-    //@ts-ignore
-    errors: sample(errorsSampled),
+    errors: errorsSampled,
     isValid,
-    __kind: "form",
-    //@ts-ignore
     validateField,
-    touched: null,
-    dirty: null,
-    merge: null,
-    ...meta
-  };
+    setErrors,
+    reset,
+    getMeta: () => meta,
+  } as any) as Form<FormValues<T>>;
+
+  //@ts-ignore
+  form.fields = createFields(form);
+
+  return form;
 };
 console.log("v", "1.12");
 /* 

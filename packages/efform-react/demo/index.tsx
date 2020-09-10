@@ -1,4 +1,4 @@
-import { array, createForm, FormValues, number, string, Values } from "efform";
+import { array, createForm, FormValues, number, string, Values, Form } from "efform";
 import * as React from "react";
 //@ts-ignore
 import { render } from "react-dom";
@@ -9,24 +9,26 @@ const root = document.createElement("div");
 document.body.appendChild(root);
 
 const address = createForm({
-  street: string(),
+  street: string("asd").length(4, 10),
 });
 
 const contacts = createForm({
   address,
 });
 
+contacts.fields.address.set({street: "fooobarrrr"})
+
 const form = createForm({
-  age: number(10),
+  age: number("foo"),
   name: string("john").length(10, 20),
   foo: array(number(5).max(4, "no more than 4"), [3, 100]),
   contacts,
   bio: { age: number() },
 });
-
 form.errors.watch((v) => {
   console.log(v)
 });
+
 //@ts-ignore
 window.form = form;
 const Field = createField(form, ({ onChange, value, validate, error }) => (
@@ -64,11 +66,17 @@ const ArrayField = createSpecificField({
     <div>
       <button onClick={() => (onChange([...value, Math.random() * 100]), validate())}>123</button>
       {value.map((v, i) => (
-        <div>{v} {error?.[i]}</div>
+        <div key={v}>{v} {error?.[i]}</div>
       ))}
     </div>
   ),
 });
+
+const AddressField = createSpecificField({
+  form: address,
+  key: "street",
+  render: ({error, onChange, validate, value}) => <input title={error} onChange={(e) => onChange(e.target.value)} value={value || ""} />
+})
 
 const App = () => {
   return (
@@ -76,6 +84,7 @@ const App = () => {
       <NumericField name="age" />
       <Field name="name" />
       <ArrayField />
+      <AddressField />
     </div>
   );
 };
