@@ -5,7 +5,8 @@
   "scripts": {
     "test": "jest",
     "start": "parcel index.html",
-    "build": "rollup src/index.ts --format cjs -c"
+    "build": "rollup src/index.ts --format cjs -c",
+    "makeTypes": "tsc -p tsconfig.json --module system --declaration --outFile dist/out.js"
   },
   "keywords": [],
   "author": "",
@@ -25,5 +26,6 @@
     "tslib": "^2.0.1",
     "typescript": "^3.9.7"
   },
-  "main": "./dist/index.js"
+  "main": "./dist/index.js",
+  "types": "./dist/out.d.ts"
 }
