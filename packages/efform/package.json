@@ -12,8 +12,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "effector": "^21.0.3",
-    "jest": "^26.1.0"
   },
   "devDependencies": {
     "@rollup/plugin-babel": "^5.2.0",
@@ -24,7 +22,13 @@
     "rollup-plugin-typescript": "^1.0.1",
     "ts-jest": "^26.1.3",
     "tslib": "^2.0.1",
-    "typescript": "^3.9.7"
+    "typescript": "^3.9.7",
+    "jest": "^26.1.0"
+
+  },
+  "peerDependencies": {
+    "efform": "^0.2.1",
+    "effector": "^21.0.3"
   },
   "main": "./dist/index.js",
   "types": "./dist/out.d.ts"

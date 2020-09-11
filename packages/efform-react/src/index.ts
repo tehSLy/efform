@@ -1,1 +1,1 @@
-export { createField } from "./createField";
+export { createField, createNumericField, createSpecificField, createStringField } from "./createField";
