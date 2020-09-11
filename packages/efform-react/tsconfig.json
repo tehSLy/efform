@@ -68,6 +68,11 @@
 	},
 	"exclude": [
 		"dist",
-		"node_modules"
+		"node_modules",
+		"demo"
+	],
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx"
 	]
 }

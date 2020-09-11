@@ -6,7 +6,7 @@
     "test": "jest",
     "start": "parcel index.html",
     "build": "rollup src/index.ts --format cjs -c",
-    "makeTypes": "typescript src/**/*.ts --declaration --allowJs --emitDeclarationOnly --outDir dist"
+    "makeTypes": "tsc -p --declaration --allowJs --emitDeclarationOnly --outDir dist"
   },
   "keywords": [],
   "author": "",
