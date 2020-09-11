@@ -1,4 +1,4 @@
-demo
-node_modules
-.cache
-.vscode
+*
+!dist
+!README.MD
+!package.json
