@@ -1,17 +1,19 @@
 {
   "name": "efform-react",
+  "version": "0.2.1",
   "dependencies": {
     "@rollup/plugin-commonjs": "^15.0.0",
     "@rollup/plugin-node-resolve": "^9.0.0",
     "effector": "^21.2.2",
     "effector-react": "^21.0.4",
     "react": "^16.13.1",
-    "rollup-plugin-peer-deps-external": "^2.2.3"
+    "rollup-plugin-peer-deps-external": "^2.2.3",
+    "efform": "^0.2.1"
   },
   "scripts": {
     "build": "rollup -c",
-    "makeTypes": "tsc --declaration --project tsconfig.json --outDir dist",
-		"start": "parcel demo/index.html"
+    "makeTypes": "typescript src/**/*.ts --declaration --allowJs --emitDeclarationOnly --outDir dist",
+    "start": "parcel demo/index.html"
   },
   "devDependencies": {
     "@rollup/plugin-babel": "^5.2.0",
@@ -31,6 +33,6 @@
     "effector": "^21.2.2",
     "effector-react": "^21.0.4"
   },
-  "main": "./build/index.js",
-  "module": "./build/index.es.js"
+  "main": "./dist/index.js",
+  "module": "./dist/index.es.js"
 }
