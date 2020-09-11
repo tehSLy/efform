@@ -1,12 +1,12 @@
 {
   "name": "efform",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "",
   "scripts": {
     "test": "jest",
     "start": "parcel index.html",
     "build": "rollup src/index.ts --format cjs -c",
-    "makeTypes": "tsc -p tsconfig.json --module system --declaration --outFile dist/out.js"
+    "makeTypes": "typescript src/**/*.ts --declaration --allowJs --emitDeclarationOnly --outDir dist"
   },
   "keywords": [],
   "author": "",

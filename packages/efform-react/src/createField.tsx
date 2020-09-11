@@ -1,5 +1,5 @@
 import { useStoreMap } from "effector-react";
-import { Form, Schema, ValuesGeneric } from "efform";
+import { Form, Schema, ValuesGeneric } from "efform/dist/typeDef";
 import { useCallback } from "react";
 import { PickOnly } from "./lib";
 

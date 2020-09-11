@@ -1,4 +1,4 @@
-import { array, createForm, FormValues, number, string, Values, Form } from "efform";
+import { array, createForm, number, string } from "efform";
 import * as React from "react";
 //@ts-ignore
 import { render } from "react-dom";
