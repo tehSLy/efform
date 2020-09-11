@@ -1,6 +1,6 @@
 {
   "name": "efform",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "",
   "scripts": {
     "test": "jest",
@@ -22,7 +22,6 @@
     "tslib": "^2.0.1",
     "typescript": "^3.9.7",
     "jest": "^26.1.0"
-
   },
   "peerDependencies": {
     "efform": "^0.2.1",
