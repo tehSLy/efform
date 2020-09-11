@@ -11,8 +11,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-  },
   "devDependencies": {
     "@rollup/plugin-babel": "^5.2.0",
     "@rollup/plugin-typescript": "^5.0.2",
