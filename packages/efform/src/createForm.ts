@@ -128,9 +128,15 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
     source: $ownState,
     mapParams: (key: keyof T, state) => ({ key, value: state[key] }),
     effect: createEffect({
-      handler: ({ key, value }: { key: keyof T; value: any }) => {
+      handler: async ({ key, value }: { key: keyof T; value: any }) => {
         //@ts-ignore
-        return parsedSchema[key].validate(value);
+        const error = parsedSchema[key].validate(value);
+        if(!error){
+          //@ts-ignore
+          return await parsedSchema[key].validateAsync(value);
+        }
+
+        return error;
       },
     }),
   });
@@ -173,7 +179,7 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
 
           if (!ownResult[key]) {
             ownPromises[key] = field
-              .validateAsync(state[key])
+              .validateAsync(state[key], state)
               .then((v) => (ownResult[key] = v));
           }
         }
@@ -213,7 +219,7 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
   });
 
   const meta: FormMeta<T> = {
-    getMeta: () => schema,
+    getSchema: () => schema,
     //@ts-ignore
     getOwnKeys: () => ownKeys,
     //@ts-ignore

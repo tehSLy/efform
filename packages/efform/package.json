@@ -1,15 +1,21 @@
 {
   "name": "efform",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "",
   "scripts": {
     "test": "jest",
     "start": "parcel index.html",
     "build": "rollup src/index.ts --format cjs -c",
-    "makeTypes": "tsc -p --declaration --allowJs --emitDeclarationOnly --outDir dist"
+    "makeTypes": "tsc -p tsconfig.json --declaration --allowJs --emitDeclarationOnly --outDir dist"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "effector",
+    "forms",
+    "manager",
+    "management",
+    "form-management"
+  ],
+  "author": "Andrey Gopienko",
   "license": "ISC",
   "devDependencies": {
     "@rollup/plugin-babel": "^5.2.0",
@@ -28,5 +34,5 @@
     "effector": "^21.0.3"
   },
   "main": "./dist/index.js",
-  "types": "./dist/out.d.ts"
+  "types": "./dist/index.d.ts"
 }

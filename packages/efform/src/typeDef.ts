@@ -3,7 +3,7 @@
 import { Effect, Event, Store } from "effector";
 import { Field } from "./createSetters";
 
-export type CustomValidator<T> = (data: T) => boolean | Promise<boolean>;
+export type CustomValidator<T> = (data: T, state: unknown) => boolean | Promise<boolean>;
 
 export interface Rule<T = any> {
   payload?: any;
@@ -71,9 +71,10 @@ export abstract class TypeDef<T = any> {
     return this.initial;
   }
 
-  protected async validateAsync(value: any) {
-    for (const { payload, message, validator } of this.asyncRules) {
-      const result = await validator(value, payload);
+
+  protected async validateAsync(value: any, state: any) {
+    for (const { payload, message, validator, stateful } of this.asyncRules) {
+      const result = await validator(value, stateful ? state : payload);
       if (!result) {
         return message || "Validation error";
       }
@@ -81,7 +82,7 @@ export abstract class TypeDef<T = any> {
     return undefined;
   }
 
-  protected validate(value: any) {
+  protected validate(value: any, state: any) {
     for (const { payload, message, validator } of this.rules) {
       const result = validator(value, payload);
       if (!result) {
@@ -91,14 +92,15 @@ export abstract class TypeDef<T = any> {
     return undefined;
   }
 
-  validation<E extends (data: T) => boolean | Promise<boolean>>(
-    validator: E,
+  validation(
+    validator: (data: T, state: D) => boolean | Promise<boolean>,
     message?: string
   ) {
     return this.setRule({
       validator,
       message,
       async: true,
+      stateful: true,
     });
   }
 
@@ -362,16 +364,16 @@ export interface Form<T> {
   errors: Store<Errors<T>>;
   validateField: Effect<keyof T, any, Error>;
 
-  isValid: Store<boolean>
-  
-  fields: {[key in keyof T]: Field<Values<T[key]>>}
+  isValid: Store<boolean>;
+
+  fields: { [key in keyof T]: Field<Values<T[key]>> };
   getMeta(): FormMeta<T>;
 }
 
 export interface FormMeta<T> {
   getOwnKeys(): (keyof FormValues<T>)[];
   getNestedKeys(): (keyof FormValues<T>)[];
-  getMeta(): T;
+  getSchema(): Schema<unknown>;
   getParsedSchema(): Schema<T>;
   validateInternal: Effect<void, Errors<T>, Error>;
 }
@@ -428,7 +430,6 @@ export type Errors<T> = T extends number | boolean | string
         : Errors<G[key]>;
     }
   : never;
-
 
 export type Value<T> = T extends NumberTypeDef
   ? number

@@ -1,14 +1,7 @@
 import { useStoreMap } from "effector-react";
-import { Form, Schema, ValuesGeneric } from "efform/dist/typeDef";
+import { Form, Schema, ValuesGeneric, FormValues } from "efform";
 import { useCallback } from "react";
 import { PickOnly } from "./lib";
-
-type Props<K extends keyof T, T> = {
-  onChange(data: T[K]): void;
-  value: T[K];
-  validate(): void;
-  error: string | null;
-};
 
 type SpecificProps<T> = {
   onChange(data: T): void;
@@ -17,28 +10,24 @@ type SpecificProps<T> = {
   error: T extends Array<any> ? (string|undefined)[] : string | undefined;
 };
 
-export const createField = function <T, K extends keyof T = keyof T>(
-  form: Form<Schema<T>>,
+export const createField = function <T, K extends keyof FormValues<T> = keyof FormValues<T>>(
+  form: Form<FormValues<T>>,
   render: (props: SpecificProps<unknown>) => JSX.Element
 ) {
   // @ts-ignore
   return ({ name, ...props }: { name: K }) => {
+    // @ts-ignore
     const [value, error] = useField(form, name);
 
-    const onChange = useCallback(
-      //@ts-ignore
-      (value: any) => form.set({ key: name, payload: value }),
-      [name]
-    );
-
-    const validate = useCallback(() => form.validateField(name), [name]);
+    const onChange = form.fields[name].set;
+    const validate = form.fields[name].validate;
     // @ts-ignore
     return render({ onChange, validate, value, error });
   };
 };
 
 export const createNumericField = function <T>(
-  form: Form<Schema<T>>,
+  form: Form<T>,
   render: (props: SpecificProps<number>) => JSX.Element
 ) {
   //@ts-ignore
@@ -46,7 +35,7 @@ export const createNumericField = function <T>(
 };
 
 export const createStringField = function <T>(
-  form: Form<Schema<T>>,
+  form: Form<T>,
   render: (props: SpecificProps<string>) => JSX.Element
 ) {
   //@ts-ignore
@@ -58,7 +47,7 @@ export const createSpecificField = function <T, K extends keyof T>({
   key,
   render,
 }: {
-  form: Form<Schema<T>>;
+  form: Form<T>;
   render: (props: SpecificProps<ValuesGeneric<T[K]>>) => React.ReactNode;
   key: K;
 }) {

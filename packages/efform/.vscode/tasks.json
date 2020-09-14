@@ -1,0 +1,32 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"label": "Build",
+			"dependsOn": [
+				"compile",
+				"make types"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"type": "npm",
+			"script": "build",
+			"group": "none",
+			"problemMatcher": [],
+			"label": "compile",
+			"detail": "rollup -c"
+		},
+		{
+			"type": "npm",
+			"script": "makeTypes",
+			"group": "none",
+			"label": "make types"
+		}
+	]
+}
