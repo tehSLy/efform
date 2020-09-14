@@ -1,5 +1,5 @@
 import { useStoreMap } from "effector-react";
-import { Form, Schema, ValuesGeneric, FormValues } from "efform";
+import { Form, FormValues, ValuesGeneric } from "efform";
 import { useCallback } from "react";
 import { PickOnly } from "./lib";
 
@@ -7,10 +7,13 @@ type SpecificProps<T> = {
   onChange(data: T): void;
   value: T;
   validate(): void;
-  error: T extends Array<any> ? (string|undefined)[] : string | undefined;
+  error: T extends Array<any> ? (string | undefined)[] : string | undefined;
 };
 
-export const createField = function <T, K extends keyof FormValues<T> = keyof FormValues<T>>(
+export const createField = function <
+  T,
+  K extends keyof FormValues<T> = keyof FormValues<T>
+>(
   form: Form<FormValues<T>>,
   render: (props: SpecificProps<unknown>) => JSX.Element
 ) {
@@ -42,15 +45,16 @@ export const createStringField = function <T>(
   return createField<T, PickOnly<T, string>>(form, render);
 };
 
-export const createSpecificField = function <T, K extends keyof T>({
-  form,
-  key,
-  render,
-}: {
-  form: Form<T>;
-  render: (props: SpecificProps<ValuesGeneric<T[K]>>) => React.ReactNode;
-  key: K;
-}) {
+export const createSpecificField = function <T, K extends keyof T>(
+  form: Form<T>,
+  {
+    key,
+    render,
+  }: {
+    render: (props: SpecificProps<ValuesGeneric<T[K]>>) => React.ReactNode;
+    key: K;
+  }
+) {
   return () => {
     const [value, error] = useField(form, key);
     const onChange = useCallback(

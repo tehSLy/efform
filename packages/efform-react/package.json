@@ -1,6 +1,6 @@
 {
   "name": "efform-react",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "scripts": {
     "build": "rollup -c",
     "makeTypes": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist --jsx preserve",
@@ -30,5 +30,11 @@
   },
   "main": "./dist/index.js",
   "module": "./dist/index.es.js",
-  "keywords": ["effector", "form", "react", "form-management", "types"]
+  "keywords": [
+    "effector",
+    "form",
+    "react",
+    "form-management",
+    "types"
+  ]
 }
