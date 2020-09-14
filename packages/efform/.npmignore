@@ -1,3 +1,8 @@
-*
-!dist
-!README.MD
+.vscode
+node_modules
+src
+tests
+jest.config.jest
+package-lock.json
+rollup.config.js
+tsconfig.json
