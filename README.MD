@@ -2,6 +2,13 @@
 
 Form manager, based on `effector` state manager, designed to deliver high-quality DX
 
+## Installation  
+
+Simply execute `npm i efform` in the terminal.  
+**Notice**: efform uses `effector` as a peer dependency, so if you don't have this package installed, install it by yourself
+
+## Usage & Basics
+
 ```ts
 import { createForm, string, number } from "efform";
 import { forward, createEffect } from "effector";
@@ -18,8 +25,6 @@ forward({ from: form.submitted, to: fxSendForm });
 form.submit();
 // => {name: "", age: 18, email: ""}
 ```
-
-## Basics
 
 In efform, **Forms** may consist of nested **Forms**, nested **Inline-Forms**, or **Fields**
 
