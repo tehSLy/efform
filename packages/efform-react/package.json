@@ -1,6 +1,6 @@
 {
   "name": "efform-react",
-  "version": "0.2.5",
+  "version": "0.2.7",
   "scripts": {
     "build": "rollup -c",
     "makeTypes": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist --jsx preserve",
@@ -36,5 +36,9 @@
     "react",
     "form-management",
     "types"
-  ]
+  ],
+  "homepage": "https://github.com/tehSLy/efform/tree/dev/packages/efform-react",
+  "bugs": {
+    "url": "https://github.com/tehSLy/efform/issues"
+  }
 }

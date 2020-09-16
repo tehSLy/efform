@@ -18,12 +18,12 @@ export const createField = function <
   render: (props: SpecificProps<unknown>) => JSX.Element
 ) {
   // @ts-ignore
-  return ({ name, ...props }: { name: K }) => {
+  return ({ for: field, ...props }: { for: K }) => {
     // @ts-ignore
     const [value, error] = useField(form, name);
 
-    const onChange = form.fields[name].set;
-    const validate = form.fields[name].validate;
+    const onChange = form.fields[field].set;
+    const validate = form.fields[field].validate;
     // @ts-ignore
     return render({ onChange, validate, value, error });
   };

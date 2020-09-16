@@ -34,5 +34,9 @@
     "effector": "^21.0.3"
   },
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts"
+  "types": "./dist/index.d.ts",
+  "homepage": "https://github.com/tehSLy/efform/tree/dev/packages/efform",
+  "bugs": {
+    "url": "https://github.com/tehSLy/efform/issues"
+  }
 }

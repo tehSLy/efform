@@ -1,4 +1,10 @@
-*
-!dist
-!README.MD
-!package.json
+.cache
+.vscode
+demo
+node_modules
+src
+.gitignore
+.prettierignore
+package-lock.json
+rollup.config.js
+tsconfig.json
