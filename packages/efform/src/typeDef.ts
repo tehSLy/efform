@@ -53,7 +53,7 @@ export abstract class TypeDef<T = any> {
   private asyncRules: Rule<T> = [];
 
   protected setRule({ payload, message, validator, async }: Rule<T>) {
-    const newInstance = this.constructor(this.initial);
+    const newInstance = new this.constructor(this.initial);
     const key = async ? "asyncRules" : "rules";
     newInstance[key] = [...this[key], { message, payload, validator }];
     return newInstance as this;
@@ -298,7 +298,7 @@ export class ArrayTypeDef<T> extends TypeDef<T[]> {
   }
 
   protected setRule({ payload, message, validator, async }: Rule<T>) {
-    const newInstance = this.constructor(this.schema, this.initial);
+    const newInstance = new this.constructor(this.schema, this.initial);
     const key = async ? "asyncRules" : "rules";
     newInstance[key] = [...this[key], { message, payload, validator }];
     return newInstance as this;
@@ -315,14 +315,22 @@ export class ArrayTypeDef<T> extends TypeDef<T[]> {
   }
 }
 
-export class BooleanTypeDef extends TypeDef {}
+export class BooleanTypeDef extends TypeDef {
+  private rules: Rule[] = [
+    {async: false, validator: (v) => typeof v === "boolean", message: "Must be boolean", key: "type"}
+  ]
+
+  constructor(private initial: boolean){
+    super(initial);
+  }
+}
 
 export const string = (initial?: string): StringTypeDef => {
   return new StringTypeDef(initial);
 };
 
-export const boolean = () => {
-  return new BooleanTypeDef();
+export const boolean = (initial: boolean) => {
+  return new BooleanTypeDef(initial);
 };
 
 export const array = <T>(schema: T, initial?: Value<T>[]) => {
