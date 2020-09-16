@@ -76,7 +76,7 @@ export const useFieldValue = function <T, K extends keyof T>(
   return useStoreMap({
     store: form.values,
     // @ts-ignore
-    fn: (state) => state[name] || null,
+    fn: (state) => state[name] === undefined ? null : state[name],
     keys: [name],
   }) as T[K];
 };
