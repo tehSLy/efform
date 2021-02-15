@@ -1,6 +1,6 @@
 {
   "name": "efform-react",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "scripts": {
     "build": "rollup -c",
     "makeTypes": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist --jsx preserve",
