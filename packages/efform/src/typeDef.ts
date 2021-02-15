@@ -3,7 +3,10 @@
 import { Effect, Event, Store } from "effector";
 import { Field } from "./createSetters";
 
-export type CustomValidator<T> = (data: T, state: unknown) => boolean | Promise<boolean>;
+export type CustomValidator<T> = (
+  data: T,
+  state: unknown
+) => boolean | Promise<boolean>;
 
 export interface Rule<T = any> {
   payload?: any;
@@ -53,7 +56,8 @@ export abstract class TypeDef<T = any> {
   private asyncRules: Rule<T> = [];
 
   protected setRule({ payload, message, validator, async }: Rule<T>) {
-    const newInstance = new this.constructor(this.initial);
+    const newInstance = this.clone();
+
     const key = async ? "asyncRules" : "rules";
     newInstance[key] = [...this[key], { message, payload, validator }];
     return newInstance as this;
@@ -70,7 +74,6 @@ export abstract class TypeDef<T = any> {
   getInitial() {
     return this.initial;
   }
-
 
   protected async validateAsync(value: any, state: any) {
     for (const { payload, message, validator, stateful } of this.asyncRules) {
@@ -113,6 +116,8 @@ export abstract class TypeDef<T = any> {
       return schema.validate(value);
     }
 
+    console.log({ schema, value });
+
     return Object.fromEntries(
       Object.entries(schema).map(([key, typeDef]) => {
         return [key, TypeDef.validateSchema(typeDef, value[key])];
@@ -127,6 +132,10 @@ export abstract class TypeDef<T = any> {
     if (schema instanceof TypeDef) {
       return schema.validateAsync(value);
     }
+  }
+
+  protected clone() {
+    return new this.constructor(this.initial);
   }
 }
 
@@ -297,16 +306,47 @@ export class ArrayTypeDef<T> extends TypeDef<T[]> {
     ];
   }
 
-  protected setRule({ payload, message, validator, async }: Rule<T>) {
-    const newInstance = new this.constructor(this.schema, this.initial);
-    const key = async ? "asyncRules" : "rules";
-    newInstance[key] = [...this[key], { message, payload, validator }];
-    return newInstance as this;
-  }
-
   validate(v: any[]) {
     const validate = (v: any) => TypeDef.validateSchema(this.schema, v);
     return v.map(validate);
+  }
+
+  validateAsync(v: any[]) {
+    const validateAsync = (v: any) => TypeDef.validateSchemaAsync(schema, v);
+    return Promise.all(v.map(validateAsync));
+  }
+
+  clone() {
+    return new this.constructor(this.schema, this.initial);
+  }
+}
+
+export class RecordTypeDef<
+  K extends string | number | symbol,
+  V
+> extends TypeDef<Record<K, V>> {
+  constructor(
+    private keyType: any,
+    private valueType: any,
+    private initial: Record<K, V>
+  ) {
+    super();
+  }
+
+  protected clone() {
+    return new this.constructor(this.keyType, this.valueType, this.initial);
+  }
+
+  validate(v: any[]) {
+    if (typeof v !== "object") {
+      return false;
+    }
+    return Object.fromEntries(
+      Object.entries(v).map(([key, value]) => [
+        key,
+        TypeDef.validateSchema(key) || TypeDef.validateSchema(value),
+      ])
+    );
   }
 
   validateAsync(v: any[]) {
@@ -317,10 +357,15 @@ export class ArrayTypeDef<T> extends TypeDef<T[]> {
 
 export class BooleanTypeDef extends TypeDef {
   private rules: Rule[] = [
-    {async: false, validator: (v) => typeof v === "boolean", message: "Must be boolean", key: "type"}
-  ]
+    {
+      async: false,
+      validator: (v) => typeof v === "boolean",
+      message: "Must be boolean",
+      key: "type",
+    },
+  ];
 
-  constructor(private initial: boolean){
+  constructor(private initial: boolean) {
     super(initial);
   }
 }
@@ -335,6 +380,14 @@ export const boolean = (initial: boolean) => {
 
 export const array = <T>(schema: T, initial?: Value<T>[]) => {
   return new ArrayTypeDef<T>(schema, initial);
+};
+
+export const record = <K extends StringTypeDef | NumberTypeDef, V>(
+  key: K,
+  schema: V,
+  initial: Record<Value<K>, Value<V>>
+) => {
+  return new RecordTypeDef<Value<K>, Value<V>>(key, schema, initial);
 };
 
 type UnionToIntersection<U> = (
@@ -439,7 +492,9 @@ export type Errors<T> = T extends number | boolean | string
     }
   : never;
 
-export type Value<T> = T extends NumberTypeDef
+export type Value<T> = T extends RecordTypeDef<infer K, infer V>
+  ? Record<K, V>
+  : T extends NumberTypeDef
   ? number
   : T extends ArrayTypeDef<infer U>
   ? Value<U>[]

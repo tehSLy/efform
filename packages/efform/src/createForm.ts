@@ -251,7 +251,7 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
 
   return form;
 };
-console.log("v", "1.12");
+
 /* 
  - guard isValid & submit
 */
