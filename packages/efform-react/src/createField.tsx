@@ -20,7 +20,7 @@ export const createField = function <
   // @ts-ignore
   return ({ for: field, ...props }: { for: K }) => {
     // @ts-ignore
-    const [value, error] = useField(form, name);
+    const [value, error] = useField(form, field);
 
     const onChange = form.fields[field].set;
     const validate = form.fields[field].validate;
@@ -76,7 +76,7 @@ export const useFieldValue = function <T, K extends keyof T>(
   return useStoreMap({
     store: form.values,
     // @ts-ignore
-    fn: (state) => state[name] === undefined ? null : state[name],
+    fn: (state) => (state[name] === undefined ? null : state[name]),
     keys: [name],
   }) as T[K];
 };
