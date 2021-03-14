@@ -12,7 +12,6 @@ import { createFields } from "./createSetters";
 import { is } from "./is";
 import { Form, FormMeta, FormValues, Schema, TypeDef, Values } from "./typeDef";
 
-
 export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
   const parsedSchema = { ...schema } as Schema<T>;
 
@@ -68,7 +67,6 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
     ...nested,
   }));
 
-  // const errorsSampled = sample($errors);
   const errorsSampled = sample($errors);
 
   nestedKeys.forEach((key) => {
@@ -113,7 +111,7 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
       [key]: payload,
     }))
     .on(fill, (state, data) => {
-      const res = {...state};
+      const res = { ...state };
       for (const key of ownKeys) {
         if (key in data) {
           // @ts-ignore
@@ -131,7 +129,7 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
       handler: async ({ key, value }: { key: keyof T; value: any }) => {
         //@ts-ignore
         const error = parsedSchema[key].validate(value);
-        if(!error){
+        if (!error) {
           //@ts-ignore
           return await parsedSchema[key].validateAsync(value);
         }
@@ -257,10 +255,14 @@ export const createForm = <T>(schema: Schema<T>): Form<FormValues<T>> => {
 */
 
 const isEmptyObject = <T>(obj: T) => {
-  return Object.keys(obj).length === 0;
+  return Object.values(obj).filter((v) => v !== undefined).length === 0;
 };
-
 function checkIsValid(obj: any) {
+  // Checking empty error slots
+  if(typeof obj === "undefined"){
+    return true;
+  }
+  // Checking the whole object
   if (typeof obj === "object") {
     if (isEmptyObject(obj)) {
       return true;

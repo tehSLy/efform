@@ -8,6 +8,11 @@ export type Field<T> = {
   validate: Effect<void, Errors<T>, Error>;
 };
 
+/**
+ * Internal method for creating and binding all the fields units.  
+ * **Own keys** are treated as separated fields thus their units are also being created and separated  
+ * **Nested keys** are treated as fields but, its API reuses already defined methods from such subforms, no units created or generated whatsoever  
+ */
 export const createFields = <T>(form: Form<T>) => {
   const {
     getOwnKeys,
@@ -17,6 +22,7 @@ export const createFields = <T>(form: Form<T>) => {
   const parsedSchema = getParsedSchema();
   const fields = {} as any;
 
+  // We wanna interpret own keys as "real" fields thus we're **creating** handlers for it
   for (const key of getOwnKeys()) {
     fields[key] = {
       //@ts-ignore
@@ -30,6 +36,8 @@ export const createFields = <T>(form: Form<T>) => {
     } as Field<any>;
   }
   
+  // As nested forms are generally just large fields related to origin form, we wanna treat them differently
+  // Thus we're not creating anything, just reusing existing methods
   for (const key of getNestedKeys()) {
     //@ts-ignore
     const formPart = parsedSchema[key] as Form<any>;
