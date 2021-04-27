@@ -15,23 +15,23 @@ export const createField = function <
   K extends keyof FormValues<T> = keyof FormValues<T>
 >(
   form: Form<FormValues<T>>,
-  render: (props: SpecificProps<unknown>) => JSX.Element
+  render: <P>(props: SpecificProps<unknown> & P) => JSX.Element
 ) {
   // @ts-ignore
-  return ({ for: field, ...props }: { for: K }) => {
+  return function<T = {}>({ for: field, ...props }: { for: K } & T){
     // @ts-ignore
     const [value, error] = useField(form, field);
 
     const onChange = form.fields[field].set;
     const validate = form.fields[field].validate;
     // @ts-ignore
-    return render({ onChange, validate, value, error });
+    return render({ onChange, validate, value, error, ...props });
   };
 };
 
 export const createNumericField = function <T>(
   form: Form<T>,
-  render: (props: SpecificProps<number>) => JSX.Element
+  render: <P>(props: SpecificProps<number> & P) => JSX.Element
 ) {
   //@ts-ignore
   return createField<T, PickOnly<T, number>>(form, render);
@@ -39,7 +39,7 @@ export const createNumericField = function <T>(
 
 export const createStringField = function <T>(
   form: Form<T>,
-  render: (props: SpecificProps<string>) => JSX.Element
+  render: <P = {}>(props: SpecificProps<string> & P) => JSX.Element
 ) {
   //@ts-ignore
   return createField<T, PickOnly<T, string>>(form, render);
@@ -51,12 +51,12 @@ export const createSpecificField = function <T, K extends keyof T>(
     key,
     render,
   }: {
-    render: (props: SpecificProps<ValuesGeneric<T[K]>>) => React.ReactNode;
+    render: <P = {}>(props: SpecificProps<ValuesGeneric<T[K]>> & P) => React.ReactNode;
     key: K;
   }
 ) {
   return () => {
-    const [value, error] = useField(form, key);
+    const { value, error } = useField(form, key);
     const onChange = useCallback(
       //@ts-ignore
       (value: any) => form.set({ key, payload: value }),
@@ -97,7 +97,7 @@ export const useField = function <T, K extends keyof T>(
   form: Form<T>,
   name: K
 ) {
-  return [useFieldValue(form, name), useFieldError(form, name)] as const;
+  return { value: useFieldValue(form, name), error: useFieldError(form, name) };
 };
 
 /*
