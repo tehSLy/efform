@@ -1,6 +1,6 @@
 import { useStoreMap } from "effector-react";
 import { Form, FormValues, ValuesGeneric } from "efform";
-import { useCallback } from "react";
+import { ComponentType, useCallback, useMemo } from "react";
 import { PickOnly } from "./lib";
 
 type SpecificProps<T> = {
@@ -15,47 +15,65 @@ export const createField = function <
   K extends keyof FormValues<T> = keyof FormValues<T>
 >(
   form: Form<FormValues<T>>,
-  render: <P>(props: SpecificProps<unknown> & P) => JSX.Element
+  render: <P>(
+    field: SpecificProps<unknown> & { fieldKey: keyof FormValues<T> },
+    props: P
+  ) => JSX.Element
 ) {
   // @ts-ignore
-  return function<T = {}>({ for: field, ...props }: { for: K } & T){
+  return function <T = {}>({ for: field, ...props }: { for: K } & T) {
     // @ts-ignore
     const [value, error] = useField(form, field);
 
     const onChange = form.fields[field].set;
     const validate = form.fields[field].validate;
     // @ts-ignore
-    return render({ onChange, validate, value, error, ...props });
+    return render({ onChange, validate, value, error, fieldKey: field }, props);
   };
 };
 
-export const createNumericField = function <T>(
+export const createNumericField = function <T, P = {}>(
   form: Form<T>,
-  render: <P>(props: SpecificProps<number> & P) => JSX.Element
+  render: (
+    field: SpecificProps<number> & { fieldKey: keyof FormValues<T> },
+    props: P
+  ) => JSX.Element
 ) {
   //@ts-ignore
-  return createField<T, PickOnly<T, number>>(form, render);
+  return createField<T, PickOnly<T, number>>(
+    form,
+    render
+  ) as any as ComponentType<P & { for: PickOnly<T, number> }>;
 };
 
-export const createStringField = function <T>(
+export const createStringField = function <T, P = {}>(
   form: Form<T>,
-  render: <P = {}>(props: SpecificProps<string> & P) => JSX.Element
+  render: (
+    field: SpecificProps<string> & { fieldKey: keyof FormValues<T> },
+    props: P
+  ) => JSX.Element
 ) {
   //@ts-ignore
-  return createField<T, PickOnly<T, string>>(form, render);
+  return createField<T, PickOnly<T, string>>(
+    form,
+    render
+  ) as any as ComponentType<P & { for: PickOnly<T, string> }>;
 };
 
-export const createSpecificField = function <T, K extends keyof T>(
+export const createSpecificField = function <T, K extends keyof T, P>(
   form: Form<T>,
   {
     key,
     render,
   }: {
-    render: <P = {}>(props: SpecificProps<ValuesGeneric<T[K]>> & P) => React.ReactNode;
+    render: (
+      field: SpecificProps<ValuesGeneric<T[K]>>,
+      props: P
+    ) => React.ReactNode;
     key: K;
   }
 ) {
-  return () => {
+  return function (props: P) {
     const { value, error } = useField(form, key);
     const onChange = useCallback(
       //@ts-ignore
@@ -64,8 +82,11 @@ export const createSpecificField = function <T, K extends keyof T>(
     );
 
     const validate = useCallback(() => form.validateField(key), [key]);
-    // @ts-ignore
-    return render({ onChange, validate, value, error }) as any;
+    return render(
+      // @ts-ignore
+      { onChange, validate, value, error },
+      props
+    ) as JSX.Element;
   };
 };
 
@@ -97,7 +118,12 @@ export const useField = function <T, K extends keyof T>(
   form: Form<T>,
   name: K
 ) {
-  return { value: useFieldValue(form, name), error: useFieldError(form, name) };
+  const value = useFieldValue(form, name);
+  const error = useFieldError(form, name);
+  return useMemo(() => {
+    const result = [value, error] as const;
+    return Object.assign(result, { value, error });
+  }, [value, error]);
 };
 
 /*
