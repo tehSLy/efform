@@ -6,7 +6,9 @@
     "test": "jest",
     "start": "parcel index.html",
     "build": "rollup src/index.ts --format cjs -c",
-    "makeTypes": "tsc -p tsconfig.json --declaration --allowJs --emitDeclarationOnly --outDir dist"
+    "makeTypes": "tsc -p tsconfig.json --declaration --allowJs --emitDeclarationOnly --outDir dist",
+    "preinstall": "node preinstall",
+    "postinstall": "node postinstall"
   },
   "keywords": [
     "effector",
